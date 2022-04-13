@@ -118,7 +118,7 @@ class Solver(object):
             # tqdm.write(f'Save parameters at {ckpt_path}')
             # torch.save(self.model.state_dict(), ckpt_path)
 
-            self.evaluate(epoch_i)
+            self.evaluate(epoch_i, save_weights=True)
 
     def evaluate(self, epoch_i, save_weights=False):
         """ Saves the frame's importance scores for the test videos in json format.
