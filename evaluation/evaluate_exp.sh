@@ -10,7 +10,8 @@ eval_method=$3  # SumMe -> max | TVSum avg
 
 exp_path="$base_path/exp$exp_num"; echo $exp_path
 
-for i in 0 1 2 3 4; do
+# for i in 0 1 2 3 4; do
+for i in 0; do
   path="$exp_path/$dataset/logs/split$i"
   python evaluation/exportTensorFlowLog.py $path $path
   results_path="$exp_path/$dataset/results/split$i"

@@ -65,9 +65,10 @@ def train_logs(log_file):
         epoch = cand_epoch
     return epoch+1
 
-
-all_fscores = np.zeros(5, dtype=float)
-for split in range(0, 5):
+num_split = 1
+all_fscores = np.zeros(num_split, dtype=float)
+#  for split in range(0, 5):
+for split in range(0, num_split):
     results_file = exp_path + "/" + dataset + "/results/split" + str(split) + "/f_scores.txt"
     log = exp_path + "/" + dataset + "/logs/split" + str(split) + "/scalars.csv"
 
