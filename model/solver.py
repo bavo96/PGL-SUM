@@ -10,9 +10,37 @@ import h5py
 from tqdm import tqdm, trange
 from layers.summarizer import PGL_SUM
 from utils import TensorboardWriter
-import sys
-sys.path.append('../')
-from evaluation import compute_fscores
+
+def evaluate_summary(predicted_summary, user_summary, eval_method):
+    """ Compare the predicted summary with the user defined one(s).
+
+    :param ndarray predicted_summary: The generated summary from our model.
+    :param ndarray user_summary: The user defined ground truth summaries (or summary).
+    :param str eval_method: The proposed evaluation method; either 'max' (SumMe) or 'avg' (TVSum).
+    :return: The reduced fscore based on the eval_method
+    """
+    max_len = max(len(predicted_summary), user_summary.shape[1])
+    S = np.zeros(max_len, dtype=int)
+    G = np.zeros(max_len, dtype=int)
+    S[:len(predicted_summary)] = predicted_summary
+
+    f_scores = []
+    for user in range(user_summary.shape[0]):
+        G[:user_summary.shape[1]] = user_summary[user]
+        overlapped = S & G
+
+        # Compute precision, recall, f-score
+        precision = sum(overlapped)/sum(S)
+        recall = sum(overlapped)/sum(G)
+        if precision+recall == 0:
+            f_scores.append(0)
+        else:
+            f_scores.append(2 * precision * recall * 100 / (precision + recall))
+
+    if eval_method == 'max':
+        return max(f_scores)
+    else:
+        return sum(f_scores)/len(f_scores)
 
 class Solver(object):
     def __init__(self, config=None, train_loader=None, test_loader=None):
@@ -76,11 +104,14 @@ class Solver(object):
     def train(self):
         last_loss = 100000
         tol = 7
+        logfile = open('trainlog.txt', 'w')
+
         """ Main function to train the PGL-SUM model. """
         for epoch_i in trange(self.config.n_epochs, desc='Epoch', ncols=80):
             self.model.train()
-
+            f1_score = []
             loss_history = []
+
             num_batches = int(len(self.train_loader) / self.config.batch_size)  # full-batch or mini batch
             iterator = iter(self.train_loader)
             for _ in trange(num_batches, desc='Batch', ncols=80, leave=False):
@@ -91,12 +122,18 @@ class Solver(object):
                 self.optimizer.zero_grad()
                 for _ in trange(self.config.batch_size, desc='Video', ncols=80, leave=False):
                     frame_features, target = next(iterator)
+                    user_summary = target.numpy()
 
                     frame_features = frame_features.to(self.config.device)
                     target = target.to(self.config.device)
 
                     output, weights = self.model(frame_features.squeeze(0))
+                    model_summary = output.cpu().detach().numpy().reshape((-1))
                     loss = self.criterion(output.squeeze(0), target.squeeze(0))
+
+                    f1 = evaluate_summary(output, target)
+                    if not np.isnan(f1):
+                        f1_score.append(f1)
 
                     if self.config.verbose:
                         tqdm.write(f'[{epoch_i}] loss: {loss.item()}')
@@ -113,7 +150,6 @@ class Solver(object):
             if diff >= tol:
                 break
 
-
             # Plot
             if self.config.verbose:
                 tqdm.write('Plotting...')
@@ -128,7 +164,9 @@ class Solver(object):
             torch.save(self.model.state_dict(), ckpt_path)
 
             self.evaluate(epoch_i, save_weights=True)
+            logfile.write('loss:', loss, 'diff:', diff)
 
+        
 
     def evaluate(self, epoch_i, save_weights=False):
         """ Saves the frame's importance scores for the test videos in json format.
