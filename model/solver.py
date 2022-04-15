@@ -10,7 +10,9 @@ import h5py
 from tqdm import tqdm, trange
 from layers.summarizer import PGL_SUM
 from utils import TensorboardWriter
-
+import sys
+sys.path.append('../')
+from evaluation import compute_fscores
 
 class Solver(object):
     def __init__(self, config=None, train_loader=None, test_loader=None):
@@ -72,6 +74,8 @@ class Solver(object):
     criterion = nn.MSELoss()
 
     def train(self):
+        last_loss = 100000
+        tol = 7
         """ Main function to train the PGL-SUM model. """
         for epoch_i in trange(self.config.n_epochs, desc='Epoch', ncols=80):
             self.model.train()
@@ -105,6 +109,10 @@ class Solver(object):
 
             # Mean loss of each training step
             loss = torch.stack(loss_history).mean()
+            diff = (loss-last_loss)/loss * 100
+            if diff >= tol:
+                break
+
 
             # Plot
             if self.config.verbose:
@@ -114,11 +122,13 @@ class Solver(object):
             # Uncomment to save parameters at checkpoint
             if not os.path.exists(self.config.save_dir):
                 os.makedirs(self.config.save_dir)
-            # ckpt_path = str(self.config.save_dir) + f'/epoch-{epoch_i}.pkl'
-            # tqdm.write(f'Save parameters at {ckpt_path}')
-            # torch.save(self.model.state_dict(), ckpt_path)
+            #  ckpt_path = str(self.config.save_dir) + f'/epoch-{epoch_i}.pkl'
+            ckpt_path = str(self.config.save_dir) + '/last_epoch.pkl'
+            tqdm.write(f'Save parameters at {ckpt_path}')
+            torch.save(self.model.state_dict(), ckpt_path)
 
             self.evaluate(epoch_i, save_weights=True)
+
 
     def evaluate(self, epoch_i, save_weights=False):
         """ Saves the frame's importance scores for the test videos in json format.
@@ -154,7 +164,7 @@ class Solver(object):
             if save_weights:
                 with h5py.File(weights_save_path, 'a') as weights:
                     weights.create_dataset(f"{video_name}/epoch_{epoch_i}", data=attn_weights)
-
+    
 
 if __name__ == '__main__':
     pass
