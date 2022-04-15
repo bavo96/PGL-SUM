@@ -131,7 +131,7 @@ class Solver(object):
                     model_summary = output.cpu().detach().numpy().reshape((-1))
                     loss = self.criterion(output.squeeze(0), target.squeeze(0))
 
-                    f1 = evaluate_summary(output, target)
+                    f1 = evaluate_summary(model_summary, user_summary, 'max')
                     if not np.isnan(f1):
                         f1_score.append(f1)
 
@@ -146,7 +146,8 @@ class Solver(object):
 
             # Mean loss of each training step
             loss = torch.stack(loss_history).mean()
-            diff = (loss-last_loss)/loss * 100
+            current_loss = loss.cpu().detach().numpy()
+            diff = (current_loss-last_loss)/current_loss* 100
             if diff >= tol:
                 break
 
@@ -163,8 +164,8 @@ class Solver(object):
             tqdm.write(f'Save parameters at {ckpt_path}')
             torch.save(self.model.state_dict(), ckpt_path)
 
-            self.evaluate(epoch_i, save_weights=True)
-            logfile.write('loss:', loss, 'diff:', diff)
+            self.evaluate(epoch_i)
+            logfile.write('epoch:' + str(epoch_i) + ' loss:' + str(current_loss) + ' diff:' + str(diff) + '\n') 
 
         
 
