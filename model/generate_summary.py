@@ -49,4 +49,6 @@ def generate_summary(shot_bound, scores, nframes, positions):
     for shot in selected:
         summary[shot_bound[shot][0]:shot_bound[shot][1] + 1] = 1
 
+    return summary
+
 

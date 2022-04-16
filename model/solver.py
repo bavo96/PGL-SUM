@@ -123,7 +123,7 @@ class Solver(object):
 
                 self.optimizer.zero_grad()
                 for _ in trange(self.config.batch_size, desc='Video', ncols=80, leave=False):
-                    frame_features, target = next(iterator)
+                    frame_features, target, _= next(iterator)
                     user_summary = target.numpy()
 
                     frame_features = frame_features.to(self.config.device)
@@ -169,10 +169,13 @@ class Solver(object):
             tqdm.write(f'Save parameters at {ckpt_path}')
             torch.save(self.model.state_dict(), ckpt_path)
 
-            self.evaluate(epoch_i)
-            logfile.write('epoch:' + str(epoch_i) + ' loss:' + str(current_loss) + ' diff:' + str(diff) + '\n') 
+            f1_train, f1_test = self.evaluate(epoch_i)
+            logfile.write('epoch:' + str(epoch_i) + ' loss:' + str(current_loss) + ' diff:' + str(diff) \
+                    + ' f1_train:' + str(f1_train) + ' f1_test:' + str(f1_test) + '\n') 
+            print('epoch:' + str(epoch_i) + ' loss:' + str(current_loss) + ' diff:' + str(diff) \
+                    + ' f1_train:' + str(f1_train) + ' f1_test:' + str(f1_test) ) 
 
-    def set_summary_from_video_index(hdf, video_index):
+    def set_summary_from_video_index(self, hdf, video_index, scores):
         sb = np.array(hdf.get('video_' + video_index + '/change_points'))
         n_frames = np.array(hdf.get('video_' + video_index + '/n_frames'))
         positions = np.array(hdf.get('video_' + video_index + '/picks'))
@@ -212,12 +215,11 @@ class Solver(object):
             # Compute F1 score for test
             video_index = video_name[6:]
             user_summary = np.array(hdf.get('video_' + video_index + '/user_summary'))
-            summary = set_summary_from_video_index(video_index, hdf)
+            summary = set_summary_from_video_index(hdf, video_index, scores)
             f1_score = evaluate_summary(summary, user_summary, 'max')
             f1_test.append(f1_score)
 
         avg_f1_test = np.mean(f1_test)
-        print(avg_f1_test)
         
         # For train
         for frame_features, gt_scores, video_name in tqdm(self.train_infer_loader, desc='Evaluate_train', ncols=80, leave=False):
@@ -232,13 +234,13 @@ class Solver(object):
             # Compute F1 score for test
             video_index = video_name[6:]
             user_summary = np.array(hdf.get('video_' + video_index + '/user_summary'))
-            summary = set_summary_from_video_index(video_index, hdf)
+            summary = set_summary_from_video_index(hdf, video_index, scores)
 
             f1_score = evaluate_summary(summary, user_summary, 'max')
             f1_train.append(f1_score)
     
         avg_f1_train = np.mean(f1_train)
 
-        print(avg_f1_train)
+        return avg_f1_train, avg_f1_test
 if __name__ == '__main__':
     pass
