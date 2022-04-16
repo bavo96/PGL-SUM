@@ -167,9 +167,14 @@ class Solver(object):
             #  ckpt_path = str(self.config.save_dir) + f'/epoch-{epoch_i}.pkl'
             ckpt_path = str(self.config.save_dir) + '/last_epoch.pkl'
             tqdm.write(f'Save parameters at {ckpt_path}')
+
             torch.save(self.model.state_dict(), ckpt_path)
 
+
             f1_train, f1_test = self.evaluate(epoch_i)
+            self.writer.update_loss(f1_train, epoch_i, 'f1_train')
+            self.writer.update_loss(f1_test, epoch_i, 'f1_test')
+
             logfile.write('epoch:' + str(epoch_i) + ' loss:' + str(current_loss) + ' diff:' + str(diff) \
                     + ' f1_train:' + str(f1_train) + ' f1_test:' + str(f1_test) + '\n') 
             print('epoch:' + str(epoch_i) + ' loss:' + str(current_loss) + ' diff:' + str(diff) \
