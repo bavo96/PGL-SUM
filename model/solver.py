@@ -172,7 +172,12 @@ class Solver(object):
             self.evaluate(epoch_i)
             logfile.write('epoch:' + str(epoch_i) + ' loss:' + str(current_loss) + ' diff:' + str(diff) + '\n') 
 
-        
+    def set_summary_from_video_index(hdf, video_index):
+        sb = np.array(hdf.get('video_' + video_index + '/change_points'))
+        n_frames = np.array(hdf.get('video_' + video_index + '/n_frames'))
+        positions = np.array(hdf.get('video_' + video_index + '/picks'))
+        summary = generate_summary(sb, scores, n_frames, positions)
+        return summary
 
     def evaluate(self, epoch_i, save_weights=False):
         """ Saves the frame's importance scores for the test videos in json format.
@@ -207,28 +212,9 @@ class Solver(object):
             # Compute F1 score for test
             video_index = video_name[6:]
             user_summary = np.array(hdf.get('video_' + video_index + '/user_summary'))
-            sb = np.array(hdf.get('video_' + video_index + '/change_points'))
-            n_frames = np.array(hdf.get('video_' + video_index + '/n_frames'))
-            positions = np.array(hdf.get('video_' + video_index + '/picks'))
-            summary = generate_summary(sb, scores, n_frames, positions)
-
+            summary = set_summary_from_video_index(video_index, hdf)
             f1_score = evaluate_summary(summary, user_summary, 'max')
             f1_test.append(f1_score)
-
-
-            if not os.path.exists(self.config.score_dir):
-                os.makedirs(self.config.score_dir)
-
-            scores_save_path = self.config.score_dir.joinpath(f"{self.config.video_type}_{epoch_i}.json")
-            with open(scores_save_path, 'w') as f:
-                if self.config.verbose:
-                    tqdm.write(f'Saving score at {str(scores_save_path)}.')
-                json.dump(out_scores_test, f)
-            scores_save_path.chmod(0o777)
-
-            if save_weights:
-                with h5py.File(weights_save_path, 'a') as weights:
-                    weights.create_dataset(f"{video_name}/epoch_{epoch_i}", data=attn_weights)
 
         avg_f1_test = np.mean(f1_test)
         print(avg_f1_test)
@@ -244,7 +230,11 @@ class Solver(object):
                 attn_weights = attn_weights.cpu().numpy()
 
             # Compute F1 score for test
-            f1_score = evaluate_summary(scores, gt_scores, 'max')
+            video_index = video_name[6:]
+            user_summary = np.array(hdf.get('video_' + video_index + '/user_summary'))
+            summary = set_summary_from_video_index(video_index, hdf)
+
+            f1_score = evaluate_summary(summary, user_summary, 'max')
             f1_train.append(f1_score)
     
         avg_f1_train = np.mean(f1_train)
