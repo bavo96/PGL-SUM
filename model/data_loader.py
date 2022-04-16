@@ -60,11 +60,12 @@ class VideoData(Dataset):
         frame_features = self.list_frame_features[index]
         gtscore = self.list_gtscores[index]
 
-        if self.mode == 'test':
-            return frame_features, video_name
-        else:
-            return frame_features, gtscore
-
+        #  if self.mode == 'test':
+        #      return frame_features, video_name
+        #  else:
+        #      return frame_features, gtscore
+        return frame_features, gtscore, video_name
+        
 
 def get_loader(mode, video_type, split_index):
     """ Loads the `data.Dataset` of the `split_index` split for the `video_type` Dataset.

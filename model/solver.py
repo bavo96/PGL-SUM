@@ -7,7 +7,7 @@ import os
 import random
 import json
 import h5py
-from tqdm import tqdm, trange
+from tqdm.notebook import tqdm, trange
 from layers.summarizer import PGL_SUM
 from utils import TensorboardWriter
 
@@ -43,7 +43,7 @@ def evaluate_summary(predicted_summary, user_summary, eval_method):
         return sum(f_scores)/len(f_scores)
 
 class Solver(object):
-    def __init__(self, config=None, train_loader=None, test_loader=None):
+    def __init__(self, config=None, train_loader=None, test_loader=None, train_infer_loader=None):
         """Class that Builds, Trains and Evaluates PGL-SUM model"""
         # Initialize variables to None, to be safe
         self.model, self.optimizer, self.writer = None, None, None
@@ -51,6 +51,7 @@ class Solver(object):
         self.config = config
         self.train_loader = train_loader
         self.test_loader = test_loader
+        self.train_infer_loader = train_infer_loader 
 
         # Set the seed for generating reproducible random numbers
         if self.config.seed is not None:
@@ -146,6 +147,8 @@ class Solver(object):
 
             # Mean loss of each training step
             loss = torch.stack(loss_history).mean()
+
+            # Early stopping
             current_loss = loss.cpu().detach().numpy()
             diff = (current_loss-last_loss)/current_loss* 100
             last_loss = current_loss
@@ -179,8 +182,12 @@ class Solver(object):
         self.model.eval()
 
         weights_save_path = self.config.score_dir.joinpath("weights.h5")
-        out_scores_dict = {}
-        for frame_features, video_name in tqdm(self.test_loader, desc='Evaluate', ncols=80, leave=False):
+        out_scores_test = {}
+        f1_test = []
+        f1_train = []
+
+        # For test
+        for frame_features, gt_scores, video_name in tqdm(self.test_loader, desc='Evaluate_test', ncols=80, leave=False):
             # [seq_len, input_size]
             frame_features = frame_features.view(-1, self.config.input_size).to(self.config.device)
 
@@ -189,22 +196,47 @@ class Solver(object):
                 scores = scores.squeeze(0).cpu().numpy().tolist()
                 attn_weights = attn_weights.cpu().numpy()
 
-                out_scores_dict[video_name] = scores
+                out_scores_test[video_name] = scores
+
+            # Compute F1 score for test
+            f1_score = evaluate_summary(scores, gt_scores, 'max')
+            f1_test.append(f1_score)
+
 
             if not os.path.exists(self.config.score_dir):
                 os.makedirs(self.config.score_dir)
 
+            evaluate_summary(
             scores_save_path = self.config.score_dir.joinpath(f"{self.config.video_type}_{epoch_i}.json")
             with open(scores_save_path, 'w') as f:
                 if self.config.verbose:
                     tqdm.write(f'Saving score at {str(scores_save_path)}.')
-                json.dump(out_scores_dict, f)
+                json.dump(out_scores_test, f)
             scores_save_path.chmod(0o777)
 
             if save_weights:
                 with h5py.File(weights_save_path, 'a') as weights:
                     weights.create_dataset(f"{video_name}/epoch_{epoch_i}", data=attn_weights)
-    
 
+        avg_f1_test = np.mean(f1_test)
+        print(avg_f1_test)
+        
+        # For train
+        for frame_features, gt_scores, video_name in tqdm(self.train_infer_loader, desc='Evaluate_train', ncols=80, leave=False):
+            # [seq_len, input_size]
+            frame_features = frame_features.view(-1, self.config.input_size).to(self.config.device)
+
+            with torch.no_grad():
+                scores, attn_weights = self.model(frame_features)  # [1, seq_len]
+                scores = scores.squeeze(0).cpu().numpy().tolist()
+                attn_weights = attn_weights.cpu().numpy()
+
+            # Compute F1 score for test
+            f1_score = evaluate_summary(scores, gt_scores, 'max')
+            f1_train.append(f1_score)
+    
+        avg_f1_train = np.mean(f1_train)
+
+        print(avg_f1_train)
 if __name__ == '__main__':
     pass

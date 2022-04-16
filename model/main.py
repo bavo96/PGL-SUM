@@ -2,6 +2,7 @@
 from configs import get_config
 from solver import Solver
 from data_loader import get_loader
+from data_loader import VideoData    
 
 
 if __name__ == '__main__':
@@ -14,7 +15,8 @@ if __name__ == '__main__':
     print('Currently selected split_index:', config.split_index)
     train_loader = get_loader(config.mode, config.video_type, config.split_index)
     test_loader = get_loader(test_config.mode, test_config.video_type, test_config.split_index)
-    solver = Solver(config, train_loader, test_loader)
+    train_infer_loader = VideoData('train', 'summe', test_config.split_index)
+    solver = Solver(config, train_loader, test_loader, train_infer_loader)
 
     solver.build()
     solver.evaluate(-1)	 # evaluates the summaries using the initial random weights of the network
