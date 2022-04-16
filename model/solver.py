@@ -215,7 +215,7 @@ class Solver(object):
             # Compute F1 score for test
             video_index = video_name[6:]
             user_summary = np.array(hdf.get('video_' + video_index + '/user_summary'))
-            summary = set_summary_from_video_index(hdf, video_index, scores)
+            summary = self.set_summary_from_video_index(hdf, video_index, scores)
             f1_score = evaluate_summary(summary, user_summary, 'max')
             f1_test.append(f1_score)
 
@@ -234,7 +234,7 @@ class Solver(object):
             # Compute F1 score for test
             video_index = video_name[6:]
             user_summary = np.array(hdf.get('video_' + video_index + '/user_summary'))
-            summary = set_summary_from_video_index(hdf, video_index, scores)
+            summary = self.set_summary_from_video_index(hdf, video_index, scores)
 
             f1_score = evaluate_summary(summary, user_summary, 'max')
             f1_train.append(f1_score)
