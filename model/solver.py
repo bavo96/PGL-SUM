@@ -148,6 +148,7 @@ class Solver(object):
             loss = torch.stack(loss_history).mean()
             current_loss = loss.cpu().detach().numpy()
             diff = (current_loss-last_loss)/current_loss* 100
+            last_loss = current_loss
             if diff >= tol:
                 break
 
