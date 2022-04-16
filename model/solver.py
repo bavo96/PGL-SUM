@@ -10,6 +10,7 @@ import h5py
 from tqdm.notebook import tqdm, trange
 from layers.summarizer import PGL_SUM
 from utils import TensorboardWriter
+from generate_summary import generate_summary
 
 def evaluate_summary(predicted_summary, user_summary, eval_method):
     """ Compare the predicted summary with the user defined one(s).
@@ -186,6 +187,11 @@ class Solver(object):
         f1_test = []
         f1_train = []
 
+        dataset_path = '../PGL-SUM/data/datasets/' + 'SumMe' + '/eccv16_dataset_' + 'summe' + '_google_pool5.h5'
+
+        hdf = h5py.File(dataset_path, 'r')
+
+
         # For test
         for frame_features, gt_scores, video_name in tqdm(self.test_loader, desc='Evaluate_test', ncols=80, leave=False):
             # [seq_len, input_size]
@@ -199,14 +205,20 @@ class Solver(object):
                 out_scores_test[video_name] = scores
 
             # Compute F1 score for test
-            f1_score = evaluate_summary(scores, gt_scores, 'max')
+            video_index = video_name[6:]
+            user_summary = np.array(hdf.get('video_' + video_index + '/user_summary'))
+            sb = np.array(hdf.get('video_' + video_index + '/change_points'))
+            n_frames = np.array(hdf.get('video_' + video_index + '/n_frames'))
+            positions = np.array(hdf.get('video_' + video_index + '/picks'))
+            summary = generate_summary(sb, scores, n_frames, positions)
+
+            f1_score = evaluate_summary(summary, user_summary, 'max')
             f1_test.append(f1_score)
 
 
             if not os.path.exists(self.config.score_dir):
                 os.makedirs(self.config.score_dir)
 
-            evaluate_summary(
             scores_save_path = self.config.score_dir.joinpath(f"{self.config.video_type}_{epoch_i}.json")
             with open(scores_save_path, 'w') as f:
                 if self.config.verbose:
